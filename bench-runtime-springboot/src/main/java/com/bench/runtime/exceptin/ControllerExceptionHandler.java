@@ -9,8 +9,11 @@ import javax.servlet.http.HttpServletRequest;
 import com.bench.common.exception.BizException;
 import com.bench.common.exception.CommonErrorEnum;
 import com.bench.common.model.JsonResult;
+import com.bench.runtime.rpc.RPCResult;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DuplicateKeyException;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.validation.BindException;
 import org.springframework.validation.FieldError;
@@ -59,8 +62,8 @@ public class ControllerExceptionHandler {
 
     @ExceptionHandler({MethodArgumentNotValidException.class})
     @ResponseBody
-    public JsonResult<Object> handleMethodArgumentNotValidException(MethodArgumentNotValidException e,
-                                                                    HttpServletRequest request) {
+    public ResponseEntity<?> handleMethodArgumentNotValidException(MethodArgumentNotValidException e,
+                                                                   HttpServletRequest request) {
         List<FieldError> fieldErrors = e.getBindingResult().getFieldErrors();
         StringBuilder sb = new StringBuilder();
         for (FieldError fieldError : fieldErrors) {
@@ -69,7 +72,12 @@ public class ControllerExceptionHandler {
 
         String msg = sb.toString();
         log.warn("handleMethodArgumentNotValidException:{} => {}", request.getRequestURI(), msg, e);
-        return JsonResult.error(msg, CommonErrorEnum.ARGUMENT_NOT_VALID.name());
+
+        // 返回内部 RPC 接口格式的 http code 和 http body
+        if (request.getRequestURI().startsWith("/internal")) {
+            return RPCResult.badRequest(msg);
+        }
+        return ResponseEntity.ok(JsonResult.error(msg, CommonErrorEnum.ARGUMENT_NOT_VALID.name()));
     }
 
     @ExceptionHandler({MethodArgumentTypeMismatchException.class})
@@ -113,11 +121,19 @@ public class ControllerExceptionHandler {
 
     @ExceptionHandler({HttpMessageNotReadableException.class})
     @ResponseBody
-    public JsonResult<Object> handleHttpMessageNotReadableException(HttpMessageNotReadableException e,
+    public ResponseEntity<?> handleHttpMessageNotReadableException(HttpMessageNotReadableException e,
                                                                     HttpServletRequest request) {
-        log.error("handleHttpMessageNotReadableException[{} -> {}]",
+        log.warn("handleHttpMessageNotReadableException[{} -> {}]",
             request.getRequestURI(), e.getMessage(), e);
-        return JsonResult.error(CommonErrorEnum.BODY_IS_MISS.message(), CommonErrorEnum.BODY_IS_MISS.name());
+
+        // 返回内部 RPC 接口格式的 http code 和 http body
+        if (request.getRequestURI().startsWith("/internal")) {
+            return RPCResult.badRequest("invalid body format");
+        }
+
+        return ResponseEntity
+                .ok()
+                .body(JsonResult.error(CommonErrorEnum.BODY_IS_MISS.message(), CommonErrorEnum.BODY_IS_MISS.name()));
     }
 
     @ExceptionHandler({Exception.class})
