@@ -1,18 +1,11 @@
 package com.bench.runtime.exceptin;
 
-import java.text.MessageFormat;
-import java.util.Iterator;
-import java.util.List;
-
-import javax.servlet.http.HttpServletRequest;
-
 import com.bench.common.exception.BizException;
 import com.bench.common.exception.CommonErrorEnum;
 import com.bench.common.model.JsonResult;
 import com.bench.runtime.rpc.RPCResult;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DuplicateKeyException;
-import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.validation.BindException;
@@ -24,6 +17,10 @@ import org.springframework.web.bind.annotation.ControllerAdvice;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.ResponseBody;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
+
+import javax.servlet.http.HttpServletRequest;
+import java.text.MessageFormat;
+import java.util.List;
 
 /**
  * @author by cold
@@ -138,8 +135,14 @@ public class ControllerExceptionHandler {
 
     @ExceptionHandler({Exception.class})
     @ResponseBody
-    public JsonResult<Object> handleException(Exception e, HttpServletRequest request) {
+    public Object handleException(Exception e, HttpServletRequest request) {
         log.error("handleException[{} -> {}]", request.getRequestURI(), e.getMessage(), e);
+
+        // 返回内部 RPC 接口格式的 http code 和 http body
+        if (request.getRequestURI().startsWith("/internal")) {
+            return RPCResult.error();
+        }
+
         return JsonResult.error(CommonErrorEnum.SYSTEM_ERROR.message(), CommonErrorEnum.SYSTEM_ERROR.name());
     }
 }
