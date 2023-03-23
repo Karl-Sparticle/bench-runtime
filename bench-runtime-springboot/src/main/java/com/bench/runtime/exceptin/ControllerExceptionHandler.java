@@ -19,6 +19,7 @@ import org.springframework.web.bind.annotation.ResponseBody;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 
 import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
 import java.text.MessageFormat;
 import java.util.List;
 
@@ -60,7 +61,7 @@ public class ControllerExceptionHandler {
     @ExceptionHandler({MethodArgumentNotValidException.class})
     @ResponseBody
     public ResponseEntity<?> handleMethodArgumentNotValidException(MethodArgumentNotValidException e,
-                                                                   HttpServletRequest request) {
+                                                                   HttpServletRequest request, HttpServletResponse response) {
         List<FieldError> fieldErrors = e.getBindingResult().getFieldErrors();
         StringBuilder sb = new StringBuilder();
         for (FieldError fieldError : fieldErrors) {
@@ -69,6 +70,8 @@ public class ControllerExceptionHandler {
 
         String msg = sb.toString();
         log.warn("handleMethodArgumentNotValidException:{} => {}", request.getRequestURI(), msg, e);
+
+        ExceptionHolder.hold(request, response, e);
 
         // 返回内部 RPC 接口格式的 http code 和 http body
         if (request.getRequestURI().startsWith("/internal")) {
@@ -119,9 +122,11 @@ public class ControllerExceptionHandler {
     @ExceptionHandler({HttpMessageNotReadableException.class})
     @ResponseBody
     public ResponseEntity<?> handleHttpMessageNotReadableException(HttpMessageNotReadableException e,
-                                                                    HttpServletRequest request) {
+                                                                    HttpServletRequest request, HttpServletResponse response) {
         log.warn("handleHttpMessageNotReadableException[{} -> {}]",
             request.getRequestURI(), e.getMessage(), e);
+
+        ExceptionHolder.hold(request, response, e);
 
         // 返回内部 RPC 接口格式的 http code 和 http body
         if (request.getRequestURI().startsWith("/internal")) {
@@ -135,8 +140,10 @@ public class ControllerExceptionHandler {
 
     @ExceptionHandler({Exception.class})
     @ResponseBody
-    public Object handleException(Exception e, HttpServletRequest request) {
+    public Object handleException(Exception e, HttpServletRequest request, HttpServletResponse response) {
         log.error("handleException[{} -> {}]", request.getRequestURI(), e.getMessage(), e);
+
+        ExceptionHolder.hold(request, response, e);
 
         // 返回内部 RPC 接口格式的 http code 和 http body
         if (request.getRequestURI().startsWith("/internal")) {
